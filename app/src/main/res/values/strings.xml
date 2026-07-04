@@ -1,3 +1,32 @@
 <resources>
-    <string name="app_name">AR-Measure</string>
+    <string name="app_name">AR Room Measuring Helper</string>
+    <string name="home_badge">ARCore measurement MVP</string>
+    <string name="home_title">AR Room Measuring Helper</string>
+    <string name="home_subtitle">Scan a room, aim with the center reticle, and place two points for an approximate real-world distance.</string>
+    <string name="home_workflow">1. Move slowly to let ARCore understand the room.\n2. Aim the reticle at a surface or object edge.\n3. Press Place Point twice to measure.</string>
+    <string name="start_measuring">Start Measuring</string>
+    <string name="home_status_ready">Ready to start an AR measurement.</string>
+    <string name="home_status_requesting_camera">Camera permission is required for AR measurement.</string>
+    <string name="home_status_camera_denied">Camera permission was denied. Enable it in settings to use AR measurement.</string>
+    <string name="home_status_checking_arcore">Checking ARCore support...</string>
+    <string name="home_status_installing_arcore">Install or update Google Play Services for AR, then return to the app.</string>
+    <string name="home_status_arcore_unsupported">This device does not support ARCore measurement.</string>
+    <string name="home_status_arcore_declined">ARCore installation was declined.</string>
+    <string name="home_status_arcore_error">ARCore could not be started on this device.</string>
+    <string name="ar_status_scanning">Move slowly. Detecting planes and object depth automatically.</string>
+    <string name="ar_status_tap_first">Aim the reticle, then place the first point.</string>
+    <string name="ar_status_tap_second">Aim the reticle, then place the second point.</string>
+    <string name="ar_status_measured">Approximate distance measured.</string>
+    <string name="ar_status_tracking_lost">Tracking lost. Move the phone slowly.</string>
+    <string name="ar_status_no_hit">No reliable surface at that point. Move slowly and aim at textured detail.</string>
+    <string name="ar_status_session_error">AR camera could not be started on this device.</string>
+    <string name="ar_surface_info_waiting">Detected: waiting for surfaces...</string>
+    <string name="ar_distance_empty">Approx. --</string>
+    <string name="ar_distance_meters">Approx. %.2f m</string>
+    <string name="ar_result_title">Current measurement</string>
+    <string name="ar_result_hint">Use the reticle for focus. Press Place Point only when the target is steady.</string>
+    <string name="ar_place_point">Place Point</string>
+    <string name="ar_undo">Undo</string>
+    <string name="ar_reset">Reset</string>
+    <string name="ar_rescan">Rescan</string>
 </resources>
