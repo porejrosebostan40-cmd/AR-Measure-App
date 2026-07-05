@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/arMeasureRoot"
     android:layout_width="match_parent"
@@ -17,58 +18,118 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <TextView
-        android:id="@+id/arStatusText"
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:id="@+id/arStatusBar"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top"
+        android:layout_gravity="top|center_horizontal"
         android:layout_marginStart="16dp"
         android:layout_marginTop="24dp"
         android:layout_marginEnd="16dp"
         android:background="@drawable/bg_ar_top_panel"
-        android:padding="12dp"
         android:gravity="center"
-        android:text="@string/ar_status_scanning"
-        android:textColor="@android:color/white"
-        android:textSize="14sp" />
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="8dp">
 
-    <TextView
-        android:id="@+id/surfaceInfoText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="88dp"
-        android:layout_marginEnd="16dp"
-        android:background="@drawable/bg_ar_top_panel"
-        android:gravity="start"
-        android:padding="10dp"
-        android:text="@string/ar_surface_info_waiting"
-        android:textColor="#D8F3EA"
-        android:textSize="13sp" />
+        <ProgressBar
+            android:id="@+id/trackingProgress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="6dp"
+            android:indeterminate="true" />
+
+        <TextView
+            android:id="@+id/arStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:minWidth="72dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/ar_status_scanning"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/surfaceInfoText"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:minWidth="76dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/ar_surface_info_waiting"
+            android:textColor="#D8F3EA"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/depthInfoText"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:minWidth="72dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/ar_depth_waiting"
+            android:textColor="#D8F3EA"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/rescanButton"
         android:layout_width="wrap_content"
         android:layout_height="44dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="156dp"
+        android:layout_marginTop="78dp"
         android:layout_marginEnd="16dp"
         android:text="@string/ar_rescan"
         android:textAllCaps="false"
         android:textSize="13sp" />
 
-    <TextView
+    <FrameLayout
         android:id="@+id/reticleView"
         android:layout_width="54dp"
         android:layout_height="54dp"
         android:layout_gravity="center"
-        android:background="@drawable/bg_reticle"
+        android:background="@drawable/bg_reticle_scanning"
+        android:clipChildren="false">
+
+        <View
+            android:layout_width="22dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center"
+            android:background="@android:color/white" />
+
+        <View
+            android:layout_width="4dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:background="@android:color/white" />
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/reticleHintText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_ar_top_panel"
         android:gravity="center"
-        android:text="+"
+        android:maxWidth="220dp"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp"
+        android:text="@string/ar_reticle_scanning"
         android:textColor="@android:color/white"
-        android:textSize="28sp"
-        android:textStyle="bold" />
+        android:textSize="12sp"
+        android:translationY="48dp" />
 
     <LinearLayout
         android:id="@+id/resultPanel"
@@ -77,9 +138,9 @@
         android:layout_gravity="bottom"
         android:background="@drawable/bg_ar_result_panel"
         android:orientation="vertical"
-        android:paddingStart="18dp"
+        android:paddingStart="12dp"
         android:paddingTop="16dp"
-        android:paddingEnd="18dp"
+        android:paddingEnd="12dp"
         android:paddingBottom="16dp">
 
         <TextView
@@ -109,47 +170,91 @@
             android:textColor="#5F706A"
             android:textSize="13sp" />
 
-    <LinearLayout
-        android:id="@+id/arControls"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingStart="0dp"
-        android:paddingEnd="0dp">
+        <LinearLayout
+            android:id="@+id/arControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:baselineAligned="false"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/undoButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="@string/ar_undo"
-            android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/undoButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:maxLines="1"
+                android:minWidth="0dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="@string/ar_undo"
+                android:textAllCaps="false"
+                android:textColor="@color/control_undo_fg"
+                android:textSize="14sp"
+                app:backgroundTint="@color/control_undo_bg"
+                app:cornerRadius="24dp"
+                app:icon="@drawable/ic_undo"
+                app:iconGravity="textStart"
+                app:iconPadding="3dp"
+                app:iconSize="17dp"
+                app:iconTint="@color/control_undo_fg"
+                app:strokeColor="#B4C7BF"
+                app:strokeWidth="1dp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/placePointButton"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1.4"
-            android:text="@string/ar_place_point"
-            android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/placePointButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
+                android:layout_weight="1.35"
+                android:maxLines="1"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="@string/ar_place_point"
+                android:textAllCaps="false"
+                android:textColor="@color/control_place_fg"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/control_place_bg"
+                app:cornerRadius="28dp"
+                app:icon="@drawable/ic_place_point"
+                app:iconGravity="textStart"
+                app:iconPadding="4dp"
+                app:iconSize="17dp"
+                app:iconTint="@color/control_place_fg" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/resetButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="@string/ar_reset"
-            android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/resetButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:maxLines="1"
+                android:minWidth="0dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="@string/ar_reset"
+                android:textAlignment="center"
+                android:textAllCaps="false"
+                android:textColor="@color/control_reset_fg"
+                android:textSize="14sp"
+                app:backgroundTint="@color/control_reset_bg"
+                app:cornerRadius="24dp"
+                app:icon="@drawable/ic_reset"
+                app:iconGravity="textStart"
+                app:iconPadding="3dp"
+                app:iconSize="17dp"
+                app:iconTint="@color/control_reset_fg" />
 
-    </LinearLayout>
+        </LinearLayout>
 
     </LinearLayout>
 

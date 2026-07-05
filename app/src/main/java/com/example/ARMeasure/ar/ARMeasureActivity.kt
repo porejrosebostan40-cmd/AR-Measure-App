@@ -3,8 +3,11 @@ package com.example.ARMeasure.ar
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import android.os.SystemClock
 import android.os.Bundle
 import android.view.Surface
+import android.view.View
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.example.ARMeasure.R
@@ -31,6 +34,10 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private lateinit var overlayView: MeasurementOverlayView
     private lateinit var statusText: TextView
     private lateinit var surfaceInfoText: TextView
+    private lateinit var depthInfoText: TextView
+    private lateinit var trackingProgress: ProgressBar
+    private lateinit var reticleView: View
+    private lateinit var reticleHintText: TextView
     private lateinit var distanceText: TextView
     private lateinit var undoButton: MaterialButton
     private lateinit var placePointButton: MaterialButton
@@ -47,7 +54,9 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private var viewportHeight = 0
     private var lastPostedStatus = 0
     private var lastPostedSurfaceInfo = ""
-    private var lastSelectedSurfaceLabel: String? = null
+    private var lastPostedDepthInfo = ""
+    private var lastReticleState: ReticleState? = null
+    private var reticleTransientUntilMs = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +66,10 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         overlayView = findViewById(R.id.measurementOverlay)
         statusText = findViewById(R.id.arStatusText)
         surfaceInfoText = findViewById(R.id.surfaceInfoText)
+        depthInfoText = findViewById(R.id.depthInfoText)
+        trackingProgress = findViewById(R.id.trackingProgress)
+        reticleView = findViewById(R.id.reticleView)
+        reticleHintText = findViewById(R.id.reticleHintText)
         distanceText = findViewById(R.id.distanceText)
         undoButton = findViewById(R.id.undoButton)
         placePointButton = findViewById(R.id.placePointButton)
@@ -97,6 +110,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                     val config = Config(arSession).apply {
                         planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                         lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+                        focusMode = Config.FocusMode.AUTO
                         if (arSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                             depthMode = Config.DepthMode.AUTOMATIC
                             depthEnabled = true
@@ -162,7 +176,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         backgroundRenderer.draw(frame)
         handleQueuedPlacement(frame)
         postFrameStatus(frame, arSession)
-        postSurfaceInfo(buildSurfaceInfo(arSession))
+        postSurfaceInfo(buildSurfaceInfo(arSession), buildDepthInfo())
         updateOverlay(frame.camera)
     }
 
@@ -173,6 +187,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         }
         if (viewportWidth == 0 || viewportHeight == 0) {
             postStatus(R.string.ar_status_scanning)
+            postReticleState(ReticleState.SCANNING)
             return
         }
         val centerX = viewportWidth / 2f
@@ -189,12 +204,14 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
         if (frame.camera.trackingState != TrackingState.TRACKING) {
             postStatus(R.string.ar_status_tracking_lost)
+            postReticleState(ReticleState.SCANNING)
             return
         }
 
         val selectedHit = selectBestHit(frame.hitTest(request.x, request.y))
         if (selectedHit == null) {
             postStatus(R.string.ar_status_no_hit)
+            postReticleState(ReticleState.NO_HIT, TRANSIENT_RETICLE_HOLD_MS)
             return
         }
 
@@ -204,8 +221,15 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 surfaceLabel = selectedHit.surfaceLabel
             )
         )
-        lastSelectedSurfaceLabel = selectedHit.surfaceLabel
         postMeasurementUi()
+        postReticleState(
+            if (measurePoints.size >= MAX_POINTS) {
+                ReticleState.MEASURED
+            } else {
+                ReticleState.POINT_PLACED
+            },
+            TRANSIENT_RETICLE_HOLD_MS
+        )
     }
 
     private fun selectBestHit(hitResults: List<HitResult>): SelectedHit? {
@@ -257,6 +281,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
         if (frame.camera.trackingState != TrackingState.TRACKING) {
             postStatus(R.string.ar_status_tracking_lost)
+            postReticleState(ReticleState.SCANNING)
             return
         }
 
@@ -270,6 +295,15 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             else -> R.string.ar_status_tap_second
         }
         postStatus(status)
+        if (SystemClock.uptimeMillis() >= reticleTransientUntilMs) {
+            postReticleState(
+                when {
+                    !hasPlane -> ReticleState.SCANNING
+                    measurePoints.isEmpty() -> ReticleState.READY_FIRST
+                    else -> ReticleState.READY_SECOND
+                }
+            )
+        }
     }
 
     private fun buildSurfaceInfo(arSession: Session): String {
@@ -280,24 +314,23 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         val vertical = planes.count { it.type == Plane.Type.VERTICAL }
         val downward = planes.count { it.type == Plane.Type.HORIZONTAL_DOWNWARD_FACING }
 
-        val detected = mutableListOf<String>()
-        if (upward > 0) detected += "$upward floor/table plane"
-        if (vertical > 0) detected += "$vertical wall/door plane"
-        if (downward > 0) detected += "$downward ceiling plane"
-
-        val detectedText = if (detected.isEmpty()) {
-            "Detected: none yet"
-        } else {
-            "Detected: ${detected.joinToString(", ")}"
+        return when {
+            upward > 0 && vertical == 0 && downward == 0 ->
+                getString(R.string.ar_surface_info_floor, upward)
+            vertical > 0 && upward == 0 && downward == 0 ->
+                getString(R.string.ar_surface_info_wall, vertical)
+            planes.isNotEmpty() ->
+                getString(R.string.ar_surface_info_mixed, planes.size)
+            else -> getString(R.string.ar_surface_info_none)
         }
-        val depthText = if (depthEnabled) {
-            "Depth: on for closer/smaller object hits"
-        } else {
-            "Depth: not supported on this device"
-        }
-        val selectedText = lastSelectedSurfaceLabel?.let { "Last selected: $it" }
+    }
 
-        return listOfNotNull(detectedText, depthText, selectedText).joinToString("\n")
+    private fun buildDepthInfo(): String {
+        return if (depthEnabled) {
+            getString(R.string.ar_depth_on)
+        } else {
+            getString(R.string.ar_depth_off)
+        }
     }
 
     private fun updateOverlay(camera: Camera) {
@@ -379,7 +412,6 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     private fun undoLastPoint() {
         measurePoints.removeLastOrNull()?.anchor?.detach()
-        lastSelectedSurfaceLabel = measurePoints.lastOrNull()?.surfaceLabel
         postMeasurementUi()
     }
 
@@ -389,6 +421,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             overlayView.clearMeasurement()
         }
         postMeasurementUi()
+        postReticleState(ReticleState.SCANNING)
     }
 
     private fun restartArScreenForFreshScan() {
@@ -400,7 +433,6 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private fun clearAnchorsOnly() {
         measurePoints.forEach { it.anchor.detach() }
         measurePoints.clear()
-        lastSelectedSurfaceLabel = null
     }
 
     private fun postStatus(messageResId: Int) {
@@ -411,11 +443,32 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun postSurfaceInfo(message: String) {
-        if (lastPostedSurfaceInfo == message) return
-        lastPostedSurfaceInfo = message
+    private fun postSurfaceInfo(surfaceMessage: String, depthMessage: String) {
+        if (lastPostedSurfaceInfo == surfaceMessage && lastPostedDepthInfo == depthMessage) return
+        lastPostedSurfaceInfo = surfaceMessage
+        lastPostedDepthInfo = depthMessage
         runOnUiThread {
-            surfaceInfoText.text = message
+            surfaceInfoText.text = surfaceMessage
+            depthInfoText.text = depthMessage
+        }
+    }
+
+    private fun postReticleState(state: ReticleState, holdMs: Long = 0L) {
+        if (lastReticleState == state) return
+        lastReticleState = state
+        reticleTransientUntilMs = if (holdMs > 0L) {
+            SystemClock.uptimeMillis() + holdMs
+        } else {
+            0L
+        }
+        runOnUiThread {
+            reticleView.setBackgroundResource(state.backgroundResId)
+            reticleHintText.setText(state.hintResId)
+            trackingProgress.visibility = if (state == ReticleState.SCANNING) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
         }
     }
 
@@ -446,6 +499,18 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         val priority: Int
     )
 
+    private enum class ReticleState(
+        val backgroundResId: Int,
+        val hintResId: Int
+    ) {
+        SCANNING(R.drawable.bg_reticle_scanning, R.string.ar_reticle_scanning),
+        READY_FIRST(R.drawable.bg_reticle_ready, R.string.ar_reticle_ready_first),
+        READY_SECOND(R.drawable.bg_reticle_ready, R.string.ar_reticle_ready_second),
+        POINT_PLACED(R.drawable.bg_reticle_placed, R.string.ar_reticle_placed),
+        NO_HIT(R.drawable.bg_reticle_error, R.string.ar_reticle_no_hit),
+        MEASURED(R.drawable.bg_reticle_placed, R.string.ar_reticle_measured)
+    }
+
     companion object {
         private const val MAX_POINTS = 2
         private const val NEAR_CLIP_METERS = 0.1f
@@ -453,5 +518,6 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         private const val HIT_PRIORITY_PLANE = 3
         private const val HIT_PRIORITY_DEPTH = 2
         private const val HIT_PRIORITY_POINT = 1
+        private const val TRANSIENT_RETICLE_HOLD_MS = 900L
     }
 }
