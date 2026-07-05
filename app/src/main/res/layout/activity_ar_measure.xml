@@ -151,15 +151,63 @@
             android:textColor="#51625D"
             android:textSize="13sp" />
 
-        <TextView
-            android:id="@+id/distanceText"
+        <LinearLayout
+            android:id="@+id/resultValueRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="@string/ar_distance_empty"
-            android:textColor="#10201C"
-            android:textSize="30sp"
-            android:textStyle="bold" />
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/distanceText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ar_distance_empty"
+                android:textColor="#10201C"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/distanceUnitText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginTop="6dp"
+                android:text="@string/ar_unit_meters"
+                android:textColor="#10201C"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/unitButton"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="124dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="@string/ar_unit_meters_name"
+                android:textAllCaps="false"
+                android:textColor="#10201C"
+                android:textSize="13sp"
+                app:cornerRadius="20dp"
+                app:icon="@drawable/ic_unit_switch"
+                app:iconGravity="textEnd"
+                app:iconPadding="4dp"
+                app:iconSize="16dp"
+                app:iconTint="#10201C"
+                app:strokeColor="#B4C7BF"
+                app:strokeWidth="1dp" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/resultHint"

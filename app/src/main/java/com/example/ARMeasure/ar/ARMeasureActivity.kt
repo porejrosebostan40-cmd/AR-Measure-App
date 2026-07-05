@@ -1,12 +1,19 @@
 package com.example.ARMeasure.ar
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.os.SystemClock
 import android.os.Bundle
+import android.view.Gravity
 import android.view.Surface
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +34,7 @@ import android.content.Intent
 import java.util.concurrent.ArrayBlockingQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.max
 import kotlin.math.sqrt
 
 class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
@@ -39,6 +47,8 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private lateinit var reticleView: View
     private lateinit var reticleHintText: TextView
     private lateinit var distanceText: TextView
+    private lateinit var distanceUnitText: TextView
+    private lateinit var unitButton: MaterialButton
     private lateinit var undoButton: MaterialButton
     private lateinit var placePointButton: MaterialButton
     private lateinit var resetButton: MaterialButton
@@ -57,6 +67,8 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private var lastPostedDepthInfo = ""
     private var lastReticleState: ReticleState? = null
     private var reticleTransientUntilMs = 0L
+    private var selectedUnit = UnitMode.METERS
+    private var unitMenuPopup: PopupWindow? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +83,8 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         reticleView = findViewById(R.id.reticleView)
         reticleHintText = findViewById(R.id.reticleHintText)
         distanceText = findViewById(R.id.distanceText)
+        distanceUnitText = findViewById(R.id.distanceUnitText)
+        unitButton = findViewById(R.id.unitButton)
         undoButton = findViewById(R.id.undoButton)
         placePointButton = findViewById(R.id.placePointButton)
         resetButton = findViewById(R.id.resetButton)
@@ -81,6 +95,10 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         surfaceView.setRenderer(this)
         surfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
+        unitButton.setOnClickListener {
+            showUnitMenu()
+        }
+
         undoButton.setOnClickListener {
             surfaceView.queueEvent {
                 undoLastPoint()
@@ -88,7 +106,13 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         }
 
         placePointButton.setOnClickListener {
-            queueCenterPlacement()
+            if (measurePoints.size >= MAX_POINTS) {
+                surfaceView.queueEvent {
+                    clearMeasurement()
+                }
+            } else {
+                queueCenterPlacement()
+            }
         }
 
         resetButton.setOnClickListener {
@@ -135,12 +159,14 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     override fun onPause() {
         super.onPause()
+        unitMenuPopup?.dismiss()
         surfaceView.onPause()
         session?.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        unitMenuPopup?.dismiss()
         clearAnchorsOnly()
         session?.close()
         session = null
@@ -247,7 +273,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         return when (val trackable = hitResult.trackable) {
             is DepthPoint -> {
                 if (trackable.trackingState == TrackingState.TRACKING) {
-                    SelectedHit(hitResult, "Depth object surface", HIT_PRIORITY_DEPTH)
+                    SelectedHit(hitResult, "Depth", HIT_PRIORITY_DEPTH)
                 } else {
                     null
                 }
@@ -267,7 +293,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                     trackable.trackingState == TrackingState.TRACKING &&
                     trackable.orientationMode == Point.OrientationMode.ESTIMATED_SURFACE_NORMAL
                 ) {
-                    SelectedHit(hitResult, "Feature point surface", HIT_PRIORITY_POINT)
+                    SelectedHit(hitResult, "Feature", HIT_PRIORITY_POINT)
                 } else {
                     null
                 }
@@ -385,11 +411,20 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
         runOnUiThread {
             undoButton.isEnabled = pointCount > 0
-            placePointButton.isEnabled = pointCount < MAX_POINTS
+            placePointButton.isEnabled = true
+            placePointButton.setText(
+                if (pointCount >= MAX_POINTS) {
+                    R.string.ar_new_measurement
+                } else {
+                    R.string.ar_place_point
+                }
+            )
             resetButton.isEnabled = pointCount > 0
             distanceText.text = distanceMeters?.let {
-                getString(R.string.ar_distance_meters, it)
+                formatDistance(it)
             } ?: getString(R.string.ar_distance_empty)
+            distanceUnitText.setText(selectedUnit.symbolResId)
+            unitButton.setText(selectedUnit.nameResId)
 
             statusText.setText(
                 when (pointCount) {
@@ -410,12 +445,115 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         return sqrt(dx * dx + dy * dy + dz * dz)
     }
 
+    private fun formatDistance(distanceMeters: Float): String {
+        return when (selectedUnit) {
+            UnitMode.METERS -> getString(R.string.ar_distance_meters, distanceMeters)
+            UnitMode.CENTIMETERS -> getString(
+                R.string.ar_distance_centimeters,
+                distanceMeters * 100f
+            )
+            UnitMode.FEET -> getString(R.string.ar_distance_feet, distanceMeters * METERS_TO_FEET)
+            UnitMode.INCHES -> getString(
+                R.string.ar_distance_inches,
+                distanceMeters * METERS_TO_INCHES
+            )
+        }
+    }
+
+    private fun showUnitMenu() {
+        unitMenuPopup?.dismiss()
+
+        val popupWidth = dp(292)
+        val popupContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = getDrawable(R.drawable.bg_unit_dropdown)
+            UnitMode.values().forEach { unitMode ->
+                addView(createUnitMenuRow(unitMode))
+            }
+        }
+
+        unitMenuPopup = PopupWindow(
+            popupContent,
+            popupWidth,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            elevation = dp(10).toFloat()
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+
+        popupContent.measure(
+            View.MeasureSpec.makeMeasureSpec(popupWidth, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+
+        val anchorLocation = IntArray(2)
+        unitButton.getLocationOnScreen(anchorLocation)
+        val x = max(dp(12), anchorLocation[0] + unitButton.width - popupWidth)
+        val y = max(dp(16), anchorLocation[1] - popupContent.measuredHeight - dp(10))
+        unitMenuPopup?.showAtLocation(window.decorView, Gravity.NO_GRAVITY, x, y)
+    }
+
+    private fun createUnitMenuRow(unitMode: UnitMode): View {
+        val isSelected = unitMode == selectedUnit
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), 0, dp(12), 0)
+            if (isSelected) {
+                background = getDrawable(R.drawable.bg_unit_dropdown_item_selected)
+            }
+            setOnClickListener {
+                selectedUnit = unitMode
+                unitMenuPopup?.dismiss()
+                unitMenuPopup = null
+                postMeasurementUi()
+            }
+        }
+
+        val label = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            text = getString(unitMode.fullLabelResId)
+            setTextColor(
+                if (isSelected) {
+                    Color.parseColor("#68F08D")
+                } else {
+                    Color.WHITE
+                }
+            )
+            textSize = 17f
+        }
+
+        val check = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
+            setImageResource(R.drawable.ic_check_unit)
+            visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
+        }
+
+        row.addView(label)
+        row.addView(check)
+        row.layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(52)
+        ).apply {
+            bottomMargin = dp(4)
+        }
+        return row
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density + 0.5f).toInt()
+    }
+
     private fun undoLastPoint() {
         measurePoints.removeLastOrNull()?.anchor?.detach()
         postMeasurementUi()
     }
 
     private fun clearMeasurement() {
+        queuedPlacementRequests.clear()
         clearAnchorsOnly()
         overlayView.post {
             overlayView.clearMeasurement()
@@ -474,9 +612,9 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     private fun planeLabel(plane: Plane): String {
         return when (plane.type) {
-            Plane.Type.HORIZONTAL_UPWARD_FACING -> "Floor/table plane"
-            Plane.Type.HORIZONTAL_DOWNWARD_FACING -> "Ceiling plane"
-            Plane.Type.VERTICAL -> "Wall/door plane"
+            Plane.Type.HORIZONTAL_UPWARD_FACING -> "Floor/table"
+            Plane.Type.HORIZONTAL_DOWNWARD_FACING -> "Ceiling"
+            Plane.Type.VERTICAL -> "Wall/door"
         }
     }
 
@@ -511,6 +649,33 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         MEASURED(R.drawable.bg_reticle_placed, R.string.ar_reticle_measured)
     }
 
+    private enum class UnitMode(
+        val symbolResId: Int,
+        val nameResId: Int,
+        val fullLabelResId: Int
+    ) {
+        METERS(
+            R.string.ar_unit_meters,
+            R.string.ar_unit_meters_name,
+            R.string.ar_unit_meters_full
+        ),
+        CENTIMETERS(
+            R.string.ar_unit_centimeters,
+            R.string.ar_unit_centimeters_name,
+            R.string.ar_unit_centimeters_full
+        ),
+        FEET(
+            R.string.ar_unit_feet,
+            R.string.ar_unit_feet_name,
+            R.string.ar_unit_feet_full
+        ),
+        INCHES(
+            R.string.ar_unit_inches,
+            R.string.ar_unit_inches_name,
+            R.string.ar_unit_inches_full
+        )
+    }
+
     companion object {
         private const val MAX_POINTS = 2
         private const val NEAR_CLIP_METERS = 0.1f
@@ -519,5 +684,7 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         private const val HIT_PRIORITY_DEPTH = 2
         private const val HIT_PRIORITY_POINT = 1
         private const val TRANSIENT_RETICLE_HOLD_MS = 900L
+        private const val METERS_TO_FEET = 3.28084f
+        private const val METERS_TO_INCHES = 39.3701f
     }
 }
