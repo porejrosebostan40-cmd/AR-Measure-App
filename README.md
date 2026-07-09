@@ -20,7 +20,7 @@ The project is intentionally grounded in a stable ARCore flow: plane-first hit t
 
 ## Contents
 
-- [Current State](#current-state)
+
 - [Experience Goals](#experience-goals)
 - [Feature Highlights](#feature-highlights)
 - [How It Works](#how-it-works)
@@ -30,27 +30,7 @@ The project is intentionally grounded in a stable ARCore flow: plane-first hit t
 - [Requirements](#requirements)
 - [Run The App](#run-the-app)
 - [Accuracy Notes](#accuracy-notes)
-- [Roadmap](#roadmap)
-- [Documentation](#documentation)
-
-## Current State
-
-The project has moved beyond the first MVP and is now in Stage 2 UI/UX and practical feature expansion.
-
-**Implementation checklist**
-
-- ✅ ARCore session startup
-- ✅ Camera permission flow
-- ✅ ARCore availability and install checks
-- ✅ Horizontal and vertical plane detection
-- ✅ Center-reticle point placement
-- ✅ Two-point distance measurement
-- ✅ Optional Depth API support when available on the device
-- ✅ Unit selector for meters, centimeters, feet, and inches
-- ✅ Undo, Reset, and Rescan controls
-- ⏳ Multiple segment path mode
-- ⏳ Lightweight share result
-- 🧭 Area and height modes for a later stage
+- [Current State](#current-state)
 
 ## Experience Goals
 
@@ -230,6 +210,25 @@ AR-Measure/
 | Place both points on the same intended object or surface. | Manual tap-to-focus is not implemented. |
 | Start with walls, floors, and tables before trying small objects. | Plane-boundary visualization is intentionally not shown because it was visually misleading in earlier iterations. |
 | Use `Rescan` if scale, tracking, or detected surfaces feel unreliable. | Measurements are approximate and should be treated as guidance, not certified dimensions. |
+
+## Current State
+
+The project has moved beyond the first MVP and is now in Stage 2 UI/UX and practical feature expansion.
+
+**Implementation checklist**
+
+- ✅ ARCore session startup
+- ✅ Camera permission flow
+- ✅ ARCore availability and install checks
+- ✅ Horizontal and vertical plane detection
+- ✅ Center-reticle point placement
+- ✅ Two-point distance measurement
+- ✅ Optional Depth API support when available on the device
+- ✅ Unit selector for meters, centimeters, feet, and inches
+- ✅ Undo, Reset, and Rescan controls
+- ⏳ Multiple segment path mode
+- ⏳ Lightweight share result
+- 🧭 Area and height modes for a later stage
 
 
 ## Development Philosophy
