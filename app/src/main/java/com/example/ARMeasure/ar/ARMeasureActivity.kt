@@ -8,6 +8,7 @@ import android.opengl.Matrix
 import android.os.SystemClock
 import android.os.Bundle
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
@@ -94,6 +95,15 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         surfaceView.setEGLContextClientVersion(2)
         surfaceView.setRenderer(this)
         surfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+
+        // A tap on the camera view is the primary way to place a measurement point.
+        // The bottom button remains available as an alternative.
+        surfaceView.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                queuePlacementAt(event.x, event.y)
+            }
+            true
+        }
 
         unitButton.setOnClickListener {
             showUnitMenu()
@@ -207,6 +217,15 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     }
 
     private fun queueCenterPlacement() {
+        if (viewportWidth == 0 || viewportHeight == 0) {
+            postStatus(R.string.ar_status_scanning)
+            postReticleState(ReticleState.SCANNING)
+            return
+        }
+        queuePlacementAt(viewportWidth / 2f, viewportHeight / 2f)
+    }
+
+    private fun queuePlacementAt(x: Float, y: Float) {
         if (measurePoints.size >= MAX_POINTS) {
             postStatus(R.string.ar_status_measured)
             return
@@ -216,9 +235,12 @@ class ARMeasureActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             postReticleState(ReticleState.SCANNING)
             return
         }
-        val centerX = viewportWidth / 2f
-        val centerY = viewportHeight / 2f
-        queuedPlacementRequests.offer(PlacementRequest(centerX, centerY))
+        queuedPlacementRequests.offer(
+            PlacementRequest(
+                x.coerceIn(0f, viewportWidth.toFloat()),
+                y.coerceIn(0f, viewportHeight.toFloat())
+            )
+        )
     }
 
     private fun handleQueuedPlacement(frame: Frame) {
